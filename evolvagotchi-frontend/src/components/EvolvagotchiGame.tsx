@@ -66,6 +66,28 @@ export function EvolvagotchiGame() {
   const CORRECT_CHAIN_ID = 50312
   const isCorrectNetwork = chainId === CORRECT_CHAIN_ID
 
+  // Function to add Somnia Testnet to MetaMask
+  const addSomniaNetwork = async () => {
+    try {
+      await window.ethereum?.request({
+        method: 'wallet_addEthereumChain',
+        params: [{
+          chainId: '0xc488', // 50312 in hex
+          chainName: 'Somnia Testnet',
+          nativeCurrency: {
+            name: 'STT',
+            symbol: 'STT',
+            decimals: 18
+          },
+          rpcUrls: ['https://dream-rpc.somnia.network'],
+          blockExplorerUrls: ['https://somnia-devnet.socialscan.io']
+        }]
+      })
+    } catch (error) {
+      console.error('Failed to add network:', error)
+    }
+  }
+
   // Get pet info for demo calculations
   const { data: petInfo } = useReadContract({
     address: CONTRACT_ADDRESS,
@@ -293,15 +315,26 @@ export function EvolvagotchiGame() {
         <div className="network-warning">
           <AlertTriangle size={24} />
           <div>
-            <strong>Wrong Network!</strong>
-            <p>Please switch to Somnia Devnet (Chain ID: 50312)</p>
+            <strong>Wrong Network Detected!</strong>
+            <p>Please connect to Somnia Testnet (Chain ID: 50312)</p>
+            <p style={{ fontSize: '12px', opacity: 0.8, marginTop: '4px' }}>
+              Click "Add Network" to automatically configure Somnia Testnet in MetaMask
+            </p>
           </div>
-          <button 
-            className="btn btn-primary" 
-            onClick={() => switchChain({ chainId: CORRECT_CHAIN_ID })}
-          >
-            Switch Network
-          </button>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button 
+              className="btn btn-secondary" 
+              onClick={addSomniaNetwork}
+            >
+              Add Network
+            </button>
+            <button 
+              className="btn btn-primary" 
+              onClick={() => switchChain({ chainId: CORRECT_CHAIN_ID })}
+            >
+              Switch Network
+            </button>
+          </div>
         </div>
       )}
 
