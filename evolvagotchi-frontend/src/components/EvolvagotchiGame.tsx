@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAccount, useConnect, useDisconnect, useWriteContract, useSwitchChain, useChainId, useReadContract } from 'wagmi'
+import { useAccount, useConnect, useDisconnect, useWriteContract, useSwitchChain, useChainId, useReadContract, useWaitForTransactionReceipt } from 'wagmi'
 import { injected } from 'wagmi/connectors'
 import { parseEther } from 'viem'
 import { Wallet, AlertTriangle, ArrowLeft, BookOpen } from 'lucide-react'
@@ -23,9 +23,14 @@ export function EvolvagotchiGame() {
   const { address, isConnected } = useAccount()
   const { connect } = useConnect()
   const { disconnect } = useDisconnect()
-  const { writeContract, isPending } = useWriteContract()
+  const { writeContract, isPending, data: hash } = useWriteContract()
   const chainId = useChainId()
   const { switchChain } = useSwitchChain()
+  
+  // Wait for mint transaction to be confirmed
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
+    hash,
+  })
 
   const [petName, setPetName] = useState('')
   const [selectedPetId, setSelectedPetId] = useState<number | null>(null)
@@ -47,6 +52,16 @@ export function EvolvagotchiGame() {
       setPendingEventCount(getEventCount(selectedPetId))
     }
   }, [selectedPetId, showEventHistory])
+
+  // Auto-refresh after successful mint
+  useEffect(() => {
+    if (isConfirmed) {
+      console.log('✅ Mint confirmed! Refreshing page...')
+      setTimeout(() => {
+        window.location.reload()
+      }, 2000) // Wait 2 seconds to show success message
+    }
+  }, [isConfirmed])
 
   const CORRECT_CHAIN_ID = 50312
   const isCorrectNetwork = chainId === CORRECT_CHAIN_ID
@@ -326,10 +341,12 @@ export function EvolvagotchiGame() {
                   <button
                     className="btn btn-primary"
                     onClick={handleMint}
-                    disabled={isPending || !petName.trim() || !isCorrectNetwork}
+                    disabled={isPending || isConfirming || !petName.trim() || !isCorrectNetwork}
                   >
-                    {isPending ? '⏳ Minting...' : `✨ Mint (${MINT_COST} STT)`}
+                    {isConfirming ? '⏳ Confirming...' : isPending ? '⏳ Minting...' : `✨ Mint (${MINT_COST} STT)`}
                   </button>
+                  {isConfirming && <p style={{ marginTop: '8px', color: '#666' }}>Waiting for transaction confirmation...</p>}
+                  {isConfirmed && <p style={{ marginTop: '8px', color: '#4caf50', fontWeight: '600' }}>✅ Mint successful! Refreshing...</p>}
                 </div>
               )}
             </>

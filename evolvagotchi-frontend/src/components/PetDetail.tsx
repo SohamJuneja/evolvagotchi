@@ -7,17 +7,22 @@ import { EventNotification } from './EventNotification'
 import  EventHistory  from './EventHistory'
 import { NFTArtGenerator } from './NFTArtGenerator'
 import { PetTimeline } from './PetTimeline'
+import { HealthAdvisor } from './HealthAdvisor'
+import { AchievementGallery } from './AchievementGallery'
 import { getPetResponse } from '../services/groqService'
 import { triggerRandomEvent, shouldTriggerEvent, getEventChance } from '../services/eventService'
 import type { GameEvent } from '../services/eventService'
 import { addPendingEvent, applyEventEffects, clearPendingEvents, getPendingEvents, hasPendingEvents } from '../services/eventStorage'
 import { logEvolution, logFeed, logPlay, logRandomEvent } from '../services/petHistory'
+import { useAchievements } from '../services/useAchievements'
 import contractABI from '../contracts/Evolvagotchi.json'
 
 const CONTRACT_ADDRESS = contractABI.address as `0x${string}`
 const FEED_COST = '0.001'
+const REVIVAL_COST = '0.005'
 const EVOLUTION_STAGES = ['🥚 Egg', '🐣 Baby', '🦖 Teen', '🐲 Adult']
 const STAGE_COLORS = ['#e0e0e0', '#ffeb3b', '#ff9800', '#f44336']
+const DEATH_STAGE = '👻 Ghost'
 
 interface PetDetailProps {
   tokenId: number
@@ -36,6 +41,7 @@ interface PetDetailProps {
 
 export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoControls, showEventHistory, setShowEventHistory }: PetDetailProps) {
   const { writeContract, data: hash, isPending } = useWriteContract()
+  const achievements = useAchievements()
   const [txStatus, setTxStatus] = useState('')
   const [petReaction, setPetReaction] = useState('')
   const [showReaction, setShowReaction] = useState(false)
@@ -199,6 +205,9 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
         value: parseEther(FEED_COST),
       })
       
+      // Record achievement
+      achievements.recordFeed(BigInt(tokenId))
+      
       // Log to history
       logFeed(tokenId, stats.name, {
         happiness: stats.happiness,
@@ -234,6 +243,9 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
         functionName: 'play',
         args: [BigInt(tokenId)],
       })
+      
+      // Record achievement
+      achievements.recordPlay(BigInt(tokenId))
       
       // Log to history
       logPlay(tokenId, stats.name, {
@@ -283,6 +295,23 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
     }
   }
 
+  const handleRevive = async () => {
+    try {
+      writeContract({
+        address: CONTRACT_ADDRESS,
+        abi: contractABI.abi,
+        functionName: 'revive',
+        args: [BigInt(tokenId)],
+        value: parseEther(REVIVAL_COST),
+      })
+      
+      // Record achievement
+      achievements.recordRevival(BigInt(tokenId))
+    } catch (error) {
+      console.error('Revive error:', error)
+    }
+  }
+
   const pet = petInfo as any
 
   if (!pet) {
@@ -298,6 +327,8 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
     hunger: Number(pet[5]),
     health: Number(pet[6]),
     blocksSinceUpdate: Number(pet[7]),
+    isDead: Boolean(pet[8]),
+    deathTimestamp: Number(pet[9]),
   }
 
   // Apply event effects to stats (only if not in demo mode)
@@ -322,6 +353,12 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
   const isDemoActive = !!demoOverrides && Object.keys(demoOverrides).length > 0
   const hasPending = hasPendingEvents(tokenId)
 
+  // First pet achievement (check once on mount)
+  useEffect(() => {
+    // Award "First Steps" achievement for owning this pet
+    achievements.recordFirstPet(BigInt(tokenId))
+  }, []) // Only run once on mount
+
   // Evolution detection effect
   useEffect(() => {
     if (previousStage !== null && stats.evolutionStage > previousStage) {
@@ -331,10 +368,38 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
       
       // Log evolution to history
       logEvolution(tokenId, stats.name, previousStage, stats.evolutionStage, EVOLUTION_STAGES[stats.evolutionStage])
+      
+      // Record evolution achievement
+      achievements.recordEvolution(BigInt(tokenId), BigInt(stats.evolutionStage))
     }
     
     setPreviousStage(stats.evolutionStage)
   }, [stats.evolutionStage, previousStage])
+
+  // Perfect stats detection
+  useEffect(() => {
+    if (stats.happiness === 100 && stats.hunger === 0 && stats.health === 100) {
+      achievements.recordPerfectStats(BigInt(tokenId))
+    }
+  }, [stats.happiness, stats.hunger, stats.health])
+
+  // Death detection - Log when pet dies
+  useEffect(() => {
+    if (stats.isDead && stats.deathTimestamp > 0) {
+      // Log death to history if it's new
+      const deathTime = stats.deathTimestamp * 1000 // Convert to ms
+      const now = Date.now()
+      
+      // Only log if death happened recently (within last hour) to avoid logging old deaths
+      if (now - deathTime < 3600000) {
+        logRandomEvent(tokenId, stats.name, '💀 Death', `${stats.name} has died`, {
+          happiness: stats.happiness,
+          hunger: stats.hunger,
+          health: 0,
+        })
+      }
+    }
+  }, [stats.isDead, stats.deathTimestamp])
 
   // Auto-hide pending banner after 10 seconds
   useEffect(() => {
@@ -441,7 +506,7 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
               </span>
             </div>
 
-            <div className="pet-visual" data-stage={stats.evolutionStage}>
+            <div className="pet-visual" data-stage={stats.isDead ? 'dead' : stats.evolutionStage}>
               <div className="stage-background"></div>
               <div className="stage-particles">
                 {Array.from({ length: 10 }).map((_, i) => (
@@ -449,8 +514,24 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
                 ))}
               </div>
               <div className="pet-emoji">
-                {EVOLUTION_STAGES[stats.evolutionStage].split(' ')[0]}
+                {stats.isDead ? '👻' : EVOLUTION_STAGES[stats.evolutionStage].split(' ')[0]}
               </div>
+              {stats.isDead && (
+                <div className="death-overlay">
+                  <div className="death-content">
+                    <h3>💀 Your Pet Has Died</h3>
+                    <p>Your {stats.name} has passed away...</p>
+                    <p className="revival-prompt">Pay {REVIVAL_COST} STT to bring them back to life!</p>
+                    <button
+                      className="btn btn-revive"
+                      onClick={handleRevive}
+                      disabled={isPending || !isCorrectNetwork}
+                    >
+                      💚 Revive for {REVIVAL_COST} STT
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="pet-stats">
@@ -499,52 +580,68 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
                 <span className="info-value">#{tokenId}</span>
               </div>
             </div>
+
+            {/* Achievement Badges */}
+            <AchievementGallery petTokenId={BigInt(tokenId)} compact={true} />
           </div>
 
           <div className="actions">
-            <button
-              className="btn btn-action btn-feed"
-              onClick={handleFeed}
-              disabled={isPending || !isCorrectNetwork}
-            >
-              <Drumstick size={20} />
-              Feed ({FEED_COST} STT)
-            </button>
+            {stats.isDead ? (
+              <button
+                className="btn btn-action btn-revive"
+                onClick={handleRevive}
+                disabled={isPending || !isCorrectNetwork}
+                style={{ width: '100%', background: '#4caf50' }}
+              >
+                💚 Revive Pet ({REVIVAL_COST} STT)
+              </button>
+            ) : (
+              <>
+                <button
+                  className="btn btn-action btn-feed"
+                  onClick={handleFeed}
+                  disabled={isPending || !isCorrectNetwork}
+                >
+                  <Drumstick size={20} />
+                  Feed ({FEED_COST} STT)
+                </button>
 
-            <button
-              className="btn btn-action btn-play"
-              onClick={handlePlay}
-              disabled={isPending || !isCorrectNetwork}
-            >
-              <Sparkles size={20} />
-              Play (Free)
-            </button>
+                <button
+                  className="btn btn-action btn-play"
+                  onClick={handlePlay}
+                  disabled={isPending || !isCorrectNetwork}
+                >
+                  <Sparkles size={20} />
+                  Play (Free)
+                </button>
 
-            <button
-              className="btn btn-action btn-update"
-              onClick={handleUpdateState}
-              disabled={isPending || !isCorrectNetwork || isSyncing}
-            >
-              <RefreshCw size={20} />
-              {hasPending ? 'Sync & Update' : 'Update Stats'}
-            </button>
+                <button
+                  className="btn btn-action btn-update"
+                  onClick={handleUpdateState}
+                  disabled={isPending || !isCorrectNetwork || isSyncing}
+                >
+                  <RefreshCw size={20} />
+                  {hasPending ? 'Sync & Update' : 'Update Stats'}
+                </button>
 
-            <button
-              className="btn btn-action btn-event"
-              onClick={handleTriggerEvent}
-              disabled={isGeneratingEvent}
-            >
-              <Zap size={20} />
-              {isGeneratingEvent ? 'Generating...' : 'Trigger Event'}
-            </button>
+                <button
+                  className="btn btn-action btn-event"
+                  onClick={handleTriggerEvent}
+                  disabled={isGeneratingEvent}
+                >
+                  <Zap size={20} />
+                  {isGeneratingEvent ? 'Generating...' : 'Trigger Event'}
+                </button>
 
-            <button
-              className="btn btn-action btn-timeline"
-              onClick={() => setShowTimeline(true)}
-            >
-              <BookOpen size={20} />
-              View Timeline
-            </button>
+                <button
+                  className="btn btn-action btn-timeline"
+                  onClick={() => setShowTimeline(true)}
+                >
+                  <BookOpen size={20} />
+                  View Timeline
+                </button>
+              </>
+            )}
           </div>
 
           {/* NFT Art Generator - Below action buttons */}
@@ -558,8 +655,9 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
           />
         </div>
 
-        {/* AI Chat Section - Now alongside the pet */}
+        {/* Right Side - AI Chat & Health Advisor */}
         <div className="chat-container">
+          {/* AI Chat Section */}
           <PetChat
             petName={stats.name}
             evolutionStage={stats.evolutionStage}
@@ -567,6 +665,30 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
             hunger={stats.hunger}
             health={stats.health}
             age={stats.age}
+          />
+          
+          {/* Health Advisor - Proactive guidance system */}
+          <HealthAdvisor 
+            stats={{
+              health: stats.health,
+              happiness: stats.happiness,
+              hunger: stats.hunger,
+              age: stats.age,
+              evolutionStage: stats.evolutionStage,
+              isDead: stats.isDead,
+            }}
+            onAction={(action) => {
+              // Handle quick actions from advisor
+              if (action.includes('Feed')) {
+                handleFeed()
+              } else if (action.includes('Play')) {
+                handlePlay()
+              } else if (action.includes('Update') || action.includes('evolve')) {
+                handleUpdateState()
+              } else if (action.includes('Revive')) {
+                handleRevive()
+              }
+            }}
           />
         </div>
       </div>
@@ -580,6 +702,8 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
           <li>✅ Stats decay automatically every ~78 seconds (hunger) and ~2.6 minutes (happiness)</li>
           <li>✅ Pet evolves automatically when conditions are met</li>
           <li>✅ Health decreases if hunger gets too high</li>
+          <li>✅ AI Health Advisor provides proactive guidance</li>
+          <li>✅ Death/Revival system with ghost state</li>
           <li>✅ Optimized for Somnia's high-speed blockchain!</li>
         </ul>
       </div>
