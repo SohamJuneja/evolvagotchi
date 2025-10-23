@@ -13,10 +13,10 @@ export const somniaTestnet = defineChain({
   },
   rpcUrls: {
     default: {
-      http: ['https://dream-rpc.somnia.network'],
+      http: ['https://dream-rpc.somnia.network', 'https://rpc.ankr.com/somnia_testnet'],
     },
     public: {
-      http: ['https://dream-rpc.somnia.network'],
+      http: ['https://dream-rpc.somnia.network', 'https://rpc.ankr.com/somnia_testnet'],
     },
   },
   blockExplorers: {
@@ -37,12 +37,10 @@ export const config = createConfig({
   ],
   transports: {
     [somniaTestnet.id]: http('https://dream-rpc.somnia.network', {
-      batch: {
-        wait: 100,
-      },
+      batch: false, // Disable batching for better compatibility
       retryCount: 5,
-      retryDelay: 200,
-      timeout: 10000,
+      retryDelay: 300,
+      timeout: 20000, // Increase timeout to 20 seconds
     }),
   },
   multiInjectedProviderDiscovery: false,

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAccount, useConnect, useDisconnect, useWriteContract, useSwitchChain, useChainId, useReadContract, useWaitForTransactionReceipt } from 'wagmi'
+import { useAccount, useConnect, useDisconnect, useWriteContract, useChainId, useReadContract, useWaitForTransactionReceipt } from 'wagmi'
 import { injected } from 'wagmi/connectors'
 import { parseEther } from 'viem'
 import { Wallet, AlertTriangle, ArrowLeft, BookOpen } from 'lucide-react'
@@ -25,7 +25,6 @@ export function EvolvagotchiGame() {
   const { disconnect } = useDisconnect()
   const { writeContract, isPending, data: hash } = useWriteContract()
   const chainId = useChainId()
-  const { switchChain } = useSwitchChain()
   
   // Wait for mint transaction to be confirmed
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
@@ -66,25 +65,71 @@ export function EvolvagotchiGame() {
   const CORRECT_CHAIN_ID = 50312
   const isCorrectNetwork = chainId === CORRECT_CHAIN_ID
 
-  // Function to add Somnia Testnet to MetaMask
+  // Function to add and switch to Somnia Testnet
   const addSomniaNetwork = async () => {
+    if (!window.ethereum) {
+      alert('Please install MetaMask to use this app!')
+      return
+    }
+
     try {
-      await window.ethereum?.request({
+      const networkConfig = {
+        chainId: '0xc488', // 50312 in hex
+        chainName: 'Somnia Testnet',
+        nativeCurrency: {
+          name: 'STT',
+          symbol: 'STT',
+          decimals: 18
+        },
+        rpcUrls: ['https://dream-rpc.somnia.network'],
+        blockExplorerUrls: ['https://somnia-devnet.socialscan.io']
+      }
+
+      // First, try to switch to the network (if it already exists)
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: '0xc488' }],
+        })
+        console.log('✅ Switched to Somnia Testnet')
+        return
+      } catch (switchError: any) {
+        // Error code 4902 means the network doesn't exist
+        if (switchError.code === 4902) {
+          console.log('Network not found, adding...')
+        } else if (switchError.code === -32002) {
+          alert('A MetaMask request is already pending. Please check your wallet.')
+          return
+        } else if (switchError.code === 4001) {
+          console.log('User rejected the network switch')
+          return
+        } else {
+          console.log('Switch error, will try to add:', switchError.message)
+        }
+      }
+
+      // Add the network
+      await window.ethereum.request({
         method: 'wallet_addEthereumChain',
-        params: [{
-          chainId: '0xc488', // 50312 in hex
-          chainName: 'Somnia Testnet',
-          nativeCurrency: {
-            name: 'STT',
-            symbol: 'STT',
-            decimals: 18
-          },
-          rpcUrls: ['https://dream-rpc.somnia.network'],
-          blockExplorerUrls: ['https://somnia-devnet.socialscan.io']
-        }]
+        params: [networkConfig]
       })
-    } catch (error) {
-      console.error('Failed to add network:', error)
+      console.log('✅ Added Somnia Testnet to MetaMask')
+      
+      // After adding, automatically switch to it
+      setTimeout(async () => {
+        try {
+          await window.ethereum.request({
+            method: 'wallet_switchEthereumChain',
+            params: [{ chainId: '0xc488' }],
+          })
+          console.log('✅ Auto-switched to Somnia Testnet')
+        } catch (e) {
+          console.log('Auto-switch after add failed (this is usually OK):', e)
+        }
+      }, 500)
+    } catch (error: any) {
+      console.error('Failed to add/switch network:', error)
+      alert(`Failed to add network: ${error.message}`)
     }
   }
 
@@ -106,15 +151,15 @@ export function EvolvagotchiGame() {
           await window.ethereum.request({
             method: 'wallet_addEthereumChain',
             params: [{
-              chainId: '0xC478',
-              chainName: 'Somnia Devnet',
+              chainId: '0xc488', // 50312 - Fixed typo!
+              chainName: 'Somnia Testnet',
               nativeCurrency: {
                 name: 'STT',
                 symbol: 'STT',
                 decimals: 18,
               },
-              rpcUrls: ['https://dream-rpc.somnia.network/'],
-              blockExplorerUrls: ['https://somniascan.io'],
+              rpcUrls: ['https://dream-rpc.somnia.network'],
+              blockExplorerUrls: ['https://somnia-devnet.socialscan.io'],
             }],
           })
         } catch (addError: any) {
@@ -315,26 +360,21 @@ export function EvolvagotchiGame() {
         <div className="network-warning">
           <AlertTriangle size={24} />
           <div>
-            <strong>Wrong Network Detected!</strong>
-            <p>Please connect to Somnia Testnet (Chain ID: 50312)</p>
-            <p style={{ fontSize: '12px', opacity: 0.8, marginTop: '4px' }}>
-              Click "Add Network" to automatically configure Somnia Testnet in MetaMask
+            <strong>Wrong Network!</strong>
+            <p>Please switch to Somnia Testnet</p>
+            <p style={{ fontSize: '13px', opacity: 0.9, marginTop: '8px' }}>
+              <strong>Network Details:</strong><br/>
+              Chain ID: 50312 (0xc488)<br/>
+              RPC: https://dream-rpc.somnia.network
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button 
-              className="btn btn-secondary" 
-              onClick={addSomniaNetwork}
-            >
-              Add Network
-            </button>
-            <button 
-              className="btn btn-primary" 
-              onClick={() => switchChain({ chainId: CORRECT_CHAIN_ID })}
-            >
-              Switch Network
-            </button>
-          </div>
+          <button 
+            className="btn btn-primary" 
+            onClick={addSomniaNetwork}
+            style={{ minWidth: '180px' }}
+          >
+            Connect to Somnia Testnet
+          </button>
         </div>
       )}
 
