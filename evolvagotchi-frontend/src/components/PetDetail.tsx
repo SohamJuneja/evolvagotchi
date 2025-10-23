@@ -22,7 +22,7 @@ const FEED_COST = '0.001'
 const REVIVAL_COST = '0.005'
 const EVOLUTION_STAGES = ['🥚 Egg', '🐣 Baby', '🦖 Teen', '🐲 Adult']
 const STAGE_COLORS = ['#e0e0e0', '#ffeb3b', '#ff9800', '#f44336']
-const DEATH_STAGE = '👻 Ghost'
+// const DEATH_STAGE = '👻 Ghost' // For future use
 
 interface PetDetailProps {
   tokenId: number

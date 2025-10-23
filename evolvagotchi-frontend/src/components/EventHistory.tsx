@@ -41,11 +41,12 @@ export default function EventHistory({ tokenId, onSync, isSyncing, onClose }: Ev
     )
   }
 
-  const formatEffect = (value: number) => {
-    if (value === 0) return null
-    const sign = value > 0 ? '+' : ''
-    return `${sign}${Math.abs(value)}`
-  }
+  // Format effect value (for future use)
+  // const formatEffect = (value: number) => {
+  //   if (value === 0) return null
+  //   const sign = value > 0 ? '+' : ''
+  //   return `${sign}${Math.abs(value)}`
+  // }
 
   return (
     <div className="event-history">

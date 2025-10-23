@@ -33,15 +33,16 @@ const QUALITY_MODIFIERS = {
   neglected: 'muted dark colors, tired appearance, sad expression, dim lighting, shadows',
 }
 
-function getLifeQuality(happiness: number, health: number): 'loved' | 'neutral' | 'neglected' {
-  const avgStat = (happiness + health) / 2
-  if (avgStat >= 70) return 'loved'
-  if (avgStat >= 40) return 'neutral'
-  return 'neglected'
-}
+// Helper function for calculating life quality from stats (for future use)
+// function getLifeQuality(happiness: number, health: number): 'loved' | 'neutral' | 'neglected' {
+//   const avgStat = (happiness + health) / 2
+//   if (avgStat >= 70) return 'loved'
+//   if (avgStat >= 40) return 'neutral'
+//   return 'neglected'
+// }
 
 export async function generatePetArt(params: ArtGenerationParams): Promise<string> {
-  const { petName, evolutionStage, happiness, health, lifeQuality } = params
+  const { petName, evolutionStage, lifeQuality } = params
   
   const stageDesc = STAGE_DESCRIPTIONS[evolutionStage as keyof typeof STAGE_DESCRIPTIONS]
   const qualityMod = QUALITY_MODIFIERS[lifeQuality]

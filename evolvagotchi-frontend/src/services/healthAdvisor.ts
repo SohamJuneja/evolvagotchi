@@ -23,7 +23,7 @@ export interface HealthPrediction {
 
 const BLOCKS_PER_SECOND = 6
 const BLOCKS_PER_HUNGER_POINT = 500  // ~78 seconds per hunger point
-const BLOCKS_PER_HAPPINESS_DECAY = 1000  // ~156 seconds per happiness point
+// const BLOCKS_PER_HAPPINESS_DECAY = 1000  // ~156 seconds per happiness point (for future use)
 
 // Evolution thresholds (in blocks)
 const EGG_TO_BABY_BLOCKS = 25000      // ~1.1 hours

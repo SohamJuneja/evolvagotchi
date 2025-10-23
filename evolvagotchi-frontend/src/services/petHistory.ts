@@ -78,7 +78,7 @@ export function logBirth(tokenId: number, petName: string): void {
 export function logEvolution(
   tokenId: number,
   petName: string,
-  fromStage: number,
+  _fromStage: number, // Prefixed with _ to indicate intentionally unused
   toStage: number,
   stageName: string
 ): void {
@@ -135,7 +135,7 @@ export function logPlay(
 // Helper: Log random event
 export function logRandomEvent(
   tokenId: number,
-  petName: string,
+  _petName: string, // Prefixed with _ to indicate intentionally unused
   eventTitle: string,
   eventDescription: string,
   stats: { happiness: number; hunger: number; health: number }
