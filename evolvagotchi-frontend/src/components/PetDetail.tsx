@@ -1,4 +1,4 @@
-import { useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi'
 import { parseEther } from 'viem'
 import { Heart, Drumstick, Sparkles, RefreshCw, Zap, BookOpen } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -9,12 +9,13 @@ import { NFTArtGenerator } from './NFTArtGenerator'
 import { PetTimeline } from './PetTimeline'
 import { HealthAdvisor } from './HealthAdvisor'
 import { AchievementGallery } from './AchievementGallery'
+import { AchievementToast } from './AchievementToast'
 import { getPetResponse } from '../services/groqService'
 import { triggerRandomEvent, shouldTriggerEvent, getEventChance } from '../services/eventService'
 import type { GameEvent } from '../services/eventService'
 import { addPendingEvent, applyEventEffects, clearPendingEvents, getPendingEvents, hasPendingEvents } from '../services/eventStorage'
 import { logEvolution, logFeed, logPlay, logRandomEvent } from '../services/petHistory'
-import { useAchievements } from '../services/useAchievements'
+import { useAchievements } from '../hooks/useAchievements'
 import contractABI from '../contracts/Evolvagotchi.json'
 
 const CONTRACT_ADDRESS = contractABI.address as `0x${string}`
@@ -41,7 +42,8 @@ interface PetDetailProps {
 
 export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoControls, showEventHistory, setShowEventHistory }: PetDetailProps) {
   const { writeContract, data: hash, isPending } = useWriteContract()
-  const achievements = useAchievements()
+  const { address } = useAccount()
+  const achievements = useAchievements(tokenId, address)
   const [txStatus, setTxStatus] = useState('')
   const [petReaction, setPetReaction] = useState('')
   const [showReaction, setShowReaction] = useState(false)
@@ -205,8 +207,8 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
         value: parseEther(FEED_COST),
       })
       
-      // Record achievement
-      achievements.recordFeed(BigInt(tokenId))
+      // Record achievement locally (no blockchain transaction!)
+      achievements.recordFeed()
       
       // Log to history
       logFeed(tokenId, stats.name, {
@@ -244,8 +246,8 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
         args: [BigInt(tokenId)],
       })
       
-      // Record achievement
-      achievements.recordPlay(BigInt(tokenId))
+      // Record achievement locally (no blockchain transaction!)
+      achievements.recordPlay()
       
       // Log to history
       logPlay(tokenId, stats.name, {
@@ -305,8 +307,8 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
         value: parseEther(REVIVAL_COST),
       })
       
-      // Record achievement
-      achievements.recordRevival(BigInt(tokenId))
+      // Record achievement locally (no blockchain transaction!)
+      achievements.recordRevival()
     } catch (error) {
       console.error('Revive error:', error)
     }
@@ -356,7 +358,7 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
   // First pet achievement (check once on mount)
   useEffect(() => {
     // Award "First Steps" achievement for owning this pet
-    achievements.recordFirstPet(BigInt(tokenId))
+    achievements.recordFirstPet()
   }, []) // Only run once on mount
 
   // Evolution detection effect
@@ -369,8 +371,8 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
       // Log evolution to history
       logEvolution(tokenId, stats.name, previousStage, stats.evolutionStage, EVOLUTION_STAGES[stats.evolutionStage])
       
-      // Record evolution achievement
-      achievements.recordEvolution(BigInt(tokenId), BigInt(stats.evolutionStage))
+      // Record evolution achievement locally (no blockchain transaction!)
+      achievements.recordEvolution(stats.evolutionStage)
     }
     
     setPreviousStage(stats.evolutionStage)
@@ -379,7 +381,8 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
   // Perfect stats detection
   useEffect(() => {
     if (stats.happiness === 100 && stats.hunger === 0 && stats.health === 100) {
-      achievements.recordPerfectStats(BigInt(tokenId))
+      // Record achievement locally (no blockchain transaction!)
+      achievements.recordPerfectStats()
     }
   }, [stats.happiness, stats.hunger, stats.health])
 
@@ -466,6 +469,15 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
       {currentEvent && (
         <EventNotification event={currentEvent} onClose={handleCloseEvent} />
       )}
+
+      {/* Achievement Toast Notifications */}
+      {achievements.newAchievements.map((achievementId) => (
+        <AchievementToast
+          key={achievementId}
+          achievementId={achievementId}
+          onClose={() => {}}
+        />
+      ))}
 
       {showEvolutionEffect && (
         <div className="evolution-effect">
