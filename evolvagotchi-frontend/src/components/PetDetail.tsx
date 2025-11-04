@@ -1,6 +1,6 @@
 import { useReadContract, useWriteContract, useWaitForTransactionReceipt, useAccount } from 'wagmi'
 import { parseEther } from 'viem'
-import { Heart, Drumstick, Sparkles, RefreshCw, Zap, BookOpen } from 'lucide-react'
+import { Heart, Drumstick, Sparkles, RefreshCw, Zap, BookOpen, Gamepad2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { PetChat } from './PetChat'
 import { EventNotification } from './EventNotification'
@@ -10,6 +10,10 @@ import { PetTimeline } from './PetTimeline'
 import { HealthAdvisor } from './HealthAdvisor'
 import { AchievementGallery } from './AchievementGallery'
 import { AchievementToast } from './AchievementToast'
+import { GameSelectionModal } from './GameSelectionModal'
+import { MemoryGame } from './MemoryGame'
+import { TicTacToe } from './TicTacToe'
+import { RockPaperScissors } from './RockPaperScissors'
 import { getPetResponse } from '../services/groqService'
 import { triggerRandomEvent, shouldTriggerEvent, getEventChance } from '../services/eventService'
 import type { GameEvent } from '../services/eventService'
@@ -56,6 +60,7 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
   const [previousStage, setPreviousStage] = useState<number | null>(null)
   const [showEvolutionEffect, setShowEvolutionEffect] = useState(false)
   const [showTimeline, setShowTimeline] = useState(false)
+  const [activeGame, setActiveGame] = useState<'selection' | 'memory' | 'tictactoe' | 'rps' | null>(null)
 
   const { data: petInfo, refetch: refetchPetInfo } = useReadContract({
     address: CONTRACT_ADDRESS,
@@ -274,6 +279,19 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
     } catch (error) {
       console.error('Play error:', error)
     }
+  }
+
+  const handleGameWin = (gameName: string) => {
+    // Store the game name in localStorage for AI chat
+    localStorage.setItem('lastGameWon', gameName)
+    
+    // First close the game modal
+    setActiveGame(null)
+    
+    // Then trigger the play reward
+    setTimeout(() => {
+      handlePlay()
+    }, 100)
   }
 
   const handleUpdateState = async () => {
@@ -620,11 +638,11 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
 
                 <button
                   className="btn btn-action btn-play"
-                  onClick={handlePlay}
+                  onClick={() => setActiveGame('selection')}
                   disabled={isPending || !isCorrectNetwork}
                 >
-                  <Sparkles size={20} />
-                  Play (Free)
+                  <Gamepad2 size={20} />
+                  Play Game (Free)
                 </button>
 
                 <button
@@ -694,7 +712,7 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
               if (action.includes('Feed')) {
                 handleFeed()
               } else if (action.includes('Play')) {
-                handlePlay()
+                setActiveGame('selection')
               } else if (action.includes('Update') || action.includes('evolve')) {
                 handleUpdateState()
               } else if (action.includes('Revive')) {
@@ -719,6 +737,35 @@ export function PetDetail({ tokenId, isCorrectNetwork, demoOverrides, demoContro
           <li>✅ Optimized for Somnia's high-speed blockchain!</li>
         </ul>
       </div>
+
+      {/* Game Modals */}
+      {activeGame === 'selection' && (
+        <GameSelectionModal
+          onGameSelect={setActiveGame}
+          onClose={() => setActiveGame(null)}
+        />
+      )}
+
+      {activeGame === 'memory' && (
+        <MemoryGame
+          onGameWin={(gameName) => handleGameWin(gameName)}
+          onClose={() => setActiveGame(null)}
+        />
+      )}
+
+      {activeGame === 'tictactoe' && (
+        <TicTacToe
+          onGameWin={(gameName) => handleGameWin(gameName)}
+          onClose={() => setActiveGame(null)}
+        />
+      )}
+
+      {activeGame === 'rps' && (
+        <RockPaperScissors
+          onGameWin={(gameName) => handleGameWin(gameName)}
+          onClose={() => setActiveGame(null)}
+        />
+      )}
     </div>
   )
 }

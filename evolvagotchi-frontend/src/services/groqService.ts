@@ -33,6 +33,9 @@ function buildPrompt(context: PetContext): string {
   const stage = STAGE_NAMES[evolutionStage]
   const personalityBase = PERSONALITY_PROMPTS[evolutionStage as keyof typeof PERSONALITY_PROMPTS]
 
+  // Check if a game was recently played
+  const lastGame = localStorage.getItem('lastGameWon') || null
+  
   let situationContext = ''
   
   // Analyze pet's current state
@@ -61,7 +64,11 @@ function buildPrompt(context: PetContext): string {
       interactionContext = 'Your trainer just fed you. React with gratitude and describe how you feel. '
       break
     case 'play':
-      interactionContext = 'Your trainer just played with you. React with joy and excitement. '
+      if (lastGame) {
+        interactionContext = `Your trainer just played a game of **${lastGame}** with you! React with joy and talk about how much fun you had playing that specific game. `
+      } else {
+        interactionContext = 'Your trainer just played with you. React with joy and excitement. '
+      }
       break
     case 'greet':
       interactionContext = 'Your trainer just opened your profile. Greet them warmly and let them know how you are feeling. '
