@@ -13,7 +13,11 @@
 [Live Demo](#) | [Video Demo](#) | [Contract Explorer](https://somnia-devnet.socialscan.io/address/0xED174eE36a8027B4F82ebe7B756CDE7bAeae2249)
 
 </div>
+## 🚀 The Vision: A Pet, Not a Picture
 
+99% of NFTs are just static, lifeless assets. They're things you *own*, not things you *know*.
+
+We built Evolvagotchi to solve this. It's an autonomous on-chain companion, a living **NFT** on the **Somnia** blockchain that thinks, feels, and evolves. It's a **Crypto-AI** platform for creating a genuine, emotional bond with a digital being.
 ---
 
 ## 🎮 What is Evolvagotchi?
